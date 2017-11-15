@@ -1,0 +1,13 @@
+[package]
+name = "hila5"
+version = "0.1.0"
+authors = ["Sam Scott <sam.scott89@gmail.com>"]
+
+[dependencies]
+digest = "0.7"
+lazy_static = "0.2"
+sha3  = "0.7"
+
+[dependencies.ring]
+version = "0.9"
+default-features = false
