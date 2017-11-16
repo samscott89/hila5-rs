@@ -1,3 +1,4 @@
+extern crate byteorder;
 extern crate digest;
 #[macro_use]
 extern crate lazy_static;
@@ -5,6 +6,7 @@ extern crate sha3;
 extern crate ring;
 
 mod arith;
+mod ecc;
 mod encode;
 mod rand;
 

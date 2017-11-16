@@ -40,10 +40,11 @@ pub fn hila5_psi16() -> Vector {
     let rng = SystemRandom::new();
     let mut v = [0; HILA5_N];
     for vi in v.iter_mut() {
-        let mut rand_bytes = [0; 4];
+        let mut rand_bytes = [0u8; 4];
         rng.fill(&mut rand_bytes).unwrap();
-        *vi = (rand_bytes.iter().sum(|x| x.count_ones()) +  HILA5_Q - 16) % HILA5_Q;
+        *vi = (rand_bytes.iter().map(|x| x.count_ones() as i32).sum::<i32>() +  HILA5_Q - 16) % HILA5_Q;
     }
+    Vector(v)
 }
 
 #[cfg(test)]
