@@ -3,9 +3,10 @@ use super::*;
 pub const HILA5_PACKED14: usize = (14 * HILA5_N) / 8;
 
 /// 14-bit packing; mod q integer vector v[1024] to byte sequence d[1792]
-pub fn hila5_pack14(v: &Vector) -> [u8; HILA5_PACKED14] {
-    let mut d = [0; HILA5_PACKED14];
-    for (i, chunk) in v.0.chunks(4).enumerate() {
+pub fn hila5_pack14<V: Hila5Vector>(v: &V, d: &mut [u8]) {
+    let v = v.norm();
+    assert_eq!(d.len(), HILA5_PACKED14);
+    for (i, chunk) in v.get_inner().chunks(4).enumerate() {
         //             bits 8 to 0 of x0
         d[7*i]     = (chunk[0] & 0xff) as u8;
 
@@ -27,11 +28,10 @@ pub fn hila5_pack14(v: &Vector) -> [u8; HILA5_PACKED14] {
         //             bits 14 to 6 of x3
         d[7*i + 6] = (chunk[3] >> 6) as u8;
     }
-    d
 }
 
 /// 14-bit unpacking; bytes in d[1792] to integer vector v[1024]
-pub fn hila5_unpack14(d: &[u8]) -> Vector {
+pub fn hila5_unpack14<V: Hila5Vector>(d: &[u8]) -> V {
     assert_eq!(d.len(), HILA5_PACKED14);
     let mut v = [0; HILA5_N];
     for (i, chunk) in d.chunks(7).enumerate() {
@@ -47,7 +47,7 @@ pub fn hila5_unpack14(d: &[u8]) -> Vector {
         //             8 bits of d6 || top 6 bits of d5
         v[4*i + 3] = (chunk[6] as Scalar) << 6 | (chunk[5] >> 2) as Scalar;
     }
-    Vector(v)
+    V::from(v)
 }
 
 #[cfg(test)]
@@ -59,9 +59,10 @@ mod test {
         let mut x = [0; HILA5_N];
         x[..4].copy_from_slice(&[10951, 5645, 3732, 4089]);
         let x = Vector(x);
-        let y = hila5_pack14(&x);
+        let mut y = [0; HILA5_PACKED14];
+        hila5_pack14(&x, &mut y);
         assert_eq!(&y[..7], &[0xC7, 0x6A, 0x83, 0x45, 0xE9, 0xE4, 0x3F]);
-        assert_eq!(&x.0[..], &hila5_unpack14(&y).0[..]);
+        assert_eq!(&x.0[..], &hila5_unpack14::<Vector>(&y).0[..]);
 
     }
 }

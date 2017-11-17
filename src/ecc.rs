@@ -6,7 +6,7 @@ use std::io::Cursor;
 const xe5_len: [u8; 10] = [16 , 16 , 17 , 31 , 19 , 29 , 23 , 25 , 27 , 37];
 
 /// Compute redundancy r[] ( XOR over original ) from data d[]
-fn xe5_cod(d: &[u64], r: &mut [u64]) {
+pub fn xe5_cod(d: &[u64], r: &mut [u64]) {
     assert_eq!(d.len(), 4);
     assert_eq!(r.len(), 4);
 
@@ -43,7 +43,7 @@ fn xe5_cod(d: &[u64], r: &mut [u64]) {
 }
 
 /// Fix errors in data d[] using redundancy in r[]
-fn xe5_fix(d: &mut [u64], r: &[u64]) {
+pub fn xe5_fix(d: &mut [u64], r: &[u64]) {
     let mut ri = [
         r[0],
         r[0] >> 16,
@@ -99,7 +99,6 @@ fn switch_endianness(input: &[u64]) -> Vec<u64> {
 
 #[cfg(target_endian = "big")]
 fn switch_endianness_in_place(input: &mut [u64]) {
-    println!("Switching endianness");
     let mut tmp = vec![];
     for x in input {
         tmp.write_u64::<BigEndian>(*x).unwrap();
