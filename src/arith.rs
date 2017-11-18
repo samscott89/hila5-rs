@@ -5,7 +5,7 @@ use super::*;
 
 lazy_static! {
     /// powers of g =1945 mod q
-    static ref pow1945: [Scalar; 2048] = {
+    static ref POW1945: [Scalar; 2048] = {
         let mut tmp = [0; 2048];
         let mut x = 1;
         for p in tmp.iter_mut() {
@@ -108,13 +108,16 @@ pub fn slow_ntt(v: &Vector, c: Scalar) -> NttVector {
         let mut x = 0;
         let mut k: Scalar = 0;
         for vj in v.0.iter() {
-            x = (x + vj * pow1945[k as usize]) % HILA5_Q;
+            x = (x + vj * POW1945[k as usize]) % HILA5_Q;
             k = (k + r) & 0x7ff;
         }
         *di = (c * x) % HILA5_Q;
     }
     NttVector(d)
 }
+
+
+
 
 /// Slow inverse number theoretic transform : d = NTT ^ -1( v ) .
 pub fn slow_intt(v: &NttVector) -> Vector {
@@ -123,7 +126,7 @@ pub fn slow_intt(v: &NttVector) -> Vector {
         let r = (2 * bitrev10(i) + 1) as Scalar;
         let mut k: Scalar = 0;
         for dj in d.iter_mut() {
-            *dj = (*dj + vi * pow1945[k as usize]) % HILA5_Q;
+            *dj = (*dj + vi * POW1945[k as usize]) % HILA5_Q;
             k = (k - r) & 0x7ff;
         }
     }

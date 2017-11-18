@@ -1,12 +1,15 @@
 extern crate byteorder;
 extern crate digest;
 #[macro_use]
+extern crate error_chain;
+#[macro_use]
 extern crate lazy_static;
 extern crate sha3;
 extern crate ring;
 
 use sha3::{Digest, Sha3_256};
 
+#[cfg(test)]
 macro_rules! abbrev_eq {
     (V $x:ident, $len_l:expr, $len_r:expr, $($l:expr,)* ~ $($r:expr),*) => ( 
         assert_eq!(&$x.norm().0[..$len_l], &[$($l,)*]);
@@ -24,6 +27,37 @@ mod encode;
 mod kem;
 mod keygen;
 mod rand;
+mod recon;
+
+pub mod errors {
+    use ring;
+    use std::{fmt, io};
+    error_chain! {
+        foreign_links {
+            Fmt(fmt::Error);
+            Io(io::Error);
+            Ring(ring::error::Unspecified) #[doc = "Errors originating from `ring`"];
+        }
+    }
+}
+
+use errors::*;
+
+pub use keygen::{crypto_kem_keypair, PrivateKey, PublicKey};
+pub use kem::SharedSecret;
+
+pub fn crypto_kem_enc(pk: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+    let pk = PublicKey::from_bytes(pk);
+    kem::enc(&pk).map(|(ct, ss)| (ct, ss.0))
+}
+
+pub fn crypto_kem_dec(sk: &[u8], ct: &[u8]) -> Result<Vec<u8>> {
+    let sk = PrivateKey::from_bytes(sk);
+    kem::dec(&ct, &sk).map(|ss| ss.0)
+}
+
+// pub use keygen::{crypto_kem_keypair, PublicKey, PrivateKey};
+// pub use kem::{crypto_kem_enc, crypto_kem_dec, Ciphertext, SharedSecret};
 
 pub const HILA5_N: usize = 1024;
 pub const HILA5_Q: i32 = 12289;
@@ -75,17 +109,6 @@ impl From<[Scalar; HILA5_N]> for NttVector {
     fn from(other: [Scalar; HILA5_N]) -> Self {
         NttVector(other)
     }
-}
-
-fn u64_from_be_u8(input: &[u8; 8]) -> u64 {
-    u64::from(input[0]) << 56 |
-    u64::from(input[1]) << 48 |
-    u64::from(input[2]) << 40 |
-    u64::from(input[3]) << 32 |
-    u64::from(input[4]) << 24 |
-    u64::from(input[5]) << 16 |
-    u64::from(input[6]) << 8 |
-    u64::from(input[7])
 }
 
 fn sha3(input: &[u8]) -> Vec<u8> {

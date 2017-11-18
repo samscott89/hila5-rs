@@ -1,15 +1,13 @@
+#[cfg(target_endian = "big")]
 use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian, BigEndian};
-
+#[cfg(target_endian = "big")]
 use std::io::Cursor;
 
 
-const xe5_len: [u8; 10] = [16 , 16 , 17 , 31 , 19 , 29 , 23 , 25 , 27 , 37];
+const XE5_LENGTHS: [u8; 10] = [16 , 16 , 17 , 31 , 19 , 29 , 23 , 25 , 27 , 37];
 
 /// Compute redundancy r[] ( XOR over original ) from data d[]
-pub fn xe5_cod(d: &[u64], r: &mut [u64]) {
-    assert_eq!(d.len(), 4);
-    assert_eq!(r.len(), 4);
-
+pub fn xe5_cod(d: &[u64; 4], r: &mut [u64; 4]) {
     let d = &switch_endianness(d);
     switch_endianness_in_place(r);
 
@@ -18,7 +16,7 @@ pub fn xe5_cod(d: &[u64], r: &mut [u64]) {
     for (i, di) in d.iter().enumerate().rev() {
         let mut x = *di;
         for (j, rj) in ri.iter_mut().enumerate().skip(1) {
-            let l = xe5_len[j];
+            let l = XE5_LENGTHS[j];
             let mut t = *rj << (64 % l);
             t ^= x;
             if l < 32 {
@@ -43,7 +41,7 @@ pub fn xe5_cod(d: &[u64], r: &mut [u64]) {
 }
 
 /// Fix errors in data d[] using redundancy in r[]
-pub fn xe5_fix(d: &mut [u64], r: &[u64]) {
+pub fn xe5_fix(d: &mut [u64; 4], r: &[u64; 4]) {
     let mut ri = [
         r[0],
         r[0] >> 16,
@@ -59,11 +57,11 @@ pub fn xe5_fix(d: &mut [u64], r: &[u64]) {
 
     for (i, di) in d.iter_mut().enumerate() {
         for (j, rj) in ri.iter_mut().enumerate().skip(1) {
-            let l = xe5_len[j];
+            let l = XE5_LENGTHS[j];
             let mut x = *rj & ((1 << l) - 1);
             x |= x << l;
             if l < 32 {
-                x |= (x << (2 * l));
+                x |= x << (2 * l);
             }
             *rj = x;
         }
@@ -83,7 +81,7 @@ pub fn xe5_fix(d: &mut [u64], r: &[u64]) {
         }
         if i < 3 {
             for (j, rj) in ri.iter_mut().enumerate().skip(1) {
-                *rj >>= 64 % xe5_len[j];
+                *rj >>= 64 % XE5_LENGTHS[j];
             }
         }
 
@@ -112,7 +110,7 @@ fn switch_endianness_in_place(input: &mut [u64]) {
 fn switch_endianness(input: &[u64]) -> &[u64] { input }
 
 #[cfg(target_endian = "little")]
-fn switch_endianness_in_place(input: &mut [u64]) { }
+fn switch_endianness_in_place(_input: &mut [u64]) { }
 
 #[cfg(test)]
 mod test {
@@ -123,11 +121,7 @@ mod test {
         0x90, 0xe9, 0x79, 0x62, 0xdb, 0x3d, 0x18, 0x55, 0x6d, 0xc2, 0x2f, 0xf1,
         0x20, 0x11, 0x31, 0x42, 0x73, 0xb5, 0x28, 0xdd];
 
-        let mut d4_le = [0; 4];
-        let mut rdr = Cursor::new(d);
-        rdr.read_u64_into::<LittleEndian>(&mut d4_le);
         let d4 = [0x0D08050302010100, 0x6279E99059372215, 0xF12FC26D55183DDB, 0xDD28B57342311120];
-        assert_eq!(d4, d4_le);
         let mut r = [0; 4];
         xe5_cod(&d4, &mut r);
         assert_eq!(&r, &[0x5D193C3A9B0A3171, 0xE439D357352B06CF, 0xDF517AD4F8F2DE07, 0x492E2AC7B92B]);
