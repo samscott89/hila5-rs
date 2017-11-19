@@ -2,6 +2,7 @@ extern crate byteorder;
 extern crate digest;
 #[macro_use]
 extern crate error_chain;
+#[cfg(any(test, not(feature = "ntt")))]
 #[macro_use]
 extern crate lazy_static;
 extern crate sha3;
@@ -12,8 +13,8 @@ use sha3::{Digest, Sha3_256};
 #[cfg(test)]
 macro_rules! abbrev_eq {
     (V $x:ident, $len_l:expr, $len_r:expr, $($l:expr,)* ~ $($r:expr),*) => ( 
-        assert_eq!(&$x.norm().0[..$len_l], &[$($l,)*]);
-        assert_eq!(&$x.norm().0[HILA5_N - $len_r..], &[$($r,)*]);
+        assert_eq!(&$x.0[..$len_l], &[$($l,)*]);
+        assert_eq!(&$x.0[HILA5_N - $len_r..], &[$($r,)*]);
     );
     ($x:ident, $len_l:expr, $len_r:expr, $($l:expr,)* ~ $($r:expr),*) => ( 
         assert_eq!(&$x[..$len_l], &[$($l,)*]);
@@ -21,11 +22,16 @@ macro_rules! abbrev_eq {
     )
 }
 
+#[cfg(not(feature = "ntt"))]
 mod arith;
+#[cfg(feature = "ntt")]
+use ntt::arith;
 mod ecc;
 mod encode;
 mod kem;
 mod keygen;
+#[cfg(feature = "ntt")]
+mod ntt;
 mod rand;
 mod recon;
 
@@ -70,12 +76,17 @@ pub trait Hila5Vector: From<[Scalar; HILA5_N]> {
     fn get_inner(&self) -> &[Scalar; HILA5_N];
     fn get_inner_mut(&mut self) -> &mut [Scalar; HILA5_N];
 
-    fn norm(&self) -> Self {
-        let mut new = self.get_inner().clone();
-        for vi in new.iter_mut() {
-            *vi = (*vi + HILA5_Q) % HILA5_Q;
+    #[cfg(feature = "ntt")]
+    fn norm(&mut self) {
+        arith::two_reduce12289(self);
+        arith::correction(self);
+    }
+
+    #[cfg(not(feature = "ntt"))]
+    fn norm(&mut self) {
+        for vi in self.get_inner_mut().iter_mut() {
+            *vi = (*vi + 3 * HILA5_Q) % HILA5_Q;
         }
-        Self::from(new)
     }
 }
 

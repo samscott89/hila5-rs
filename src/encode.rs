@@ -9,7 +9,6 @@ pub const PACKED14: usize = (14 * HILA5_N) / 8;
 /// 14-bit packing; mod q integer vector v[1024] to byte sequence d[1792]
 /// aka `hila5_pack14`
 pub fn pack14<V: Hila5Vector, W: Write>(v: &V, writer: &mut W) -> Result<()> {
-    let v = v.norm();
     for chunk in v.get_inner().chunks(4) {
         writer.write_all(
             &[

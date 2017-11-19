@@ -45,10 +45,19 @@ impl PrivateKey {
     }
 
     pub fn get_shared_secret(&self, b: &NttVector) -> Vector {
-        let a = &self.key;
-        let a = a * &b;
-        let b = arith::slow_intt(&a);
-        &b * 1416
+        let a = &self.key * b;
+        let mut ss = if cfg!(feature = "ntt") {
+            // scaling factors
+            // 3651 = sqrt(-1) * 2^-10 * 3^-12
+            // 4958 = 2^-10 * 3^-12
+            // 1635 = 3^-12
+            arith::intt(a, 1635)
+        } else {
+            // Need to clear 3^6 factor; 12171 = 3^-6
+            arith::intt(a, 12171)
+        };
+        ss.norm();
+        ss
     }
 }
 
@@ -57,22 +66,27 @@ impl PrivateKey {
 pub fn crypto_kem_keypair() -> Result<(PublicKey, PrivateKey)> {
     let rng = SystemRandom::new();
 
-    let t = rand::psi16();
-    let a = arith::slow_ntt(&t, 27);
-
-    let t = rand::psi16();
-    let e = arith::slow_ntt(&t, 27);
+    let mut a = arith::ntt(rand::psi16());
+    let e = arith::ntt(rand::psi16());
     let mut seed = [0u8; rand::SEED_LEN];
     rng.fill(&mut seed)?;
 
-    let mut t: NttVector = rand::from_seed(&seed);
-    t = &t * &a;
-    t = &t + &e;
+    let g: NttVector = rand::from_seed(&seed);
+    // t = g * a + e
+    let mut t = arith::mul_add(&g, &a, &e);
+
+    #[cfg(feature = "ntt")]
+    {
+        arith::correction(&mut t);
+    }
 
     let mut pk_bytes = [0u8; rand::SEED_LEN + PACKED14];
     &pk_bytes[..rand::SEED_LEN].copy_from_slice(&seed[..]);
     encode::pack14(&t, &mut (&mut pk_bytes[rand::SEED_LEN..]))?;
     let pk_digest = sha3(&pk_bytes).to_vec();
+
+    // Normalise A before storing
+    a.norm();
 
     Ok((
         PublicKey {
@@ -103,7 +117,8 @@ pub mod test {
                 }
                 Vector::from(tmp)
             };
-            let a = arith::slow_ntt(&t, 27);
+            let mut a = arith::ntt(t);
+            a.norm();
             abbrev_eq!(V a, 5, 5, 11172, 5208, 9207, 8751, 251, ~ 7603, 3490, 9191, 8666, 8302);
             a
         };
@@ -119,16 +134,24 @@ pub mod test {
                 }
                 Vector::from(tmp)
             };
-            let e = arith::slow_ntt(&t, 27);
+            let mut e = arith::ntt(t);
+            e.norm();
             abbrev_eq!(V e, 5, 5, 8226, 10812, 6666, 1749, 2228, ~ 10169, 10648, 5731, 1585, 4171);
             let seed = [0u8; rand::SEED_LEN];
             // rng.fill(&mut seed).unwrap();
 
-            let mut t: NttVector = rand::from_seed(&seed);
-            abbrev_eq!(V t, 5, 5, 2034, 8826, 9346, 872, 2929, ~ 2816, 441, 7160, 2952, 5275);
-            t = &t * &a;
-            t = &t + &e;
+            let mut g: NttVector = rand::from_seed(&seed);
+            // g.norm();
+            // abbrev_eq!(V g, 5, 5, 2034, 8826, 9346, 872, 2929, ~ 2816, 441, 7160, 2952, 5275);
+            // t = g * a + e
+            let mut t = arith::mul_add(&g, a, &e);
+            #[cfg(feature = "ntt")]
+            {
+                t = &t * 2731;
+            }
 
+            // // force 0 <= ti < Q
+            // t.norm();
             abbrev_eq!(V t, 5, 5, 9713, 3471, 7710, 1152, 67, ~ 490, 1324, 5696, 10208, 11514);
 
             PublicKey {

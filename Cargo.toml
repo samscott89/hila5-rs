@@ -10,3 +10,7 @@ error-chain = "0.11"
 lazy_static = "0.2"
 ring = "0.12"
 sha3  = "0.7"
+
+[features]
+default = []
+ntt = []

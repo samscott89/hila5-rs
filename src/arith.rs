@@ -58,6 +58,20 @@ impl<'a> Mul<Scalar> for &'a Vector {
     }
 }
 
+/// Vector multiplication : v = c * u .
+impl<'a> Mul<Scalar> for &'a NttVector {
+    type Output = NttVector;
+
+    fn mul(self, c: Scalar) -> Self::Output {
+        let mut v = [0; HILA5_N];
+        for (i, ui) in self.0.iter().enumerate() {
+            v[i] = (ui * c) % HILA5_Q;
+        }
+
+        NttVector(v)
+    }
+}
+
 // Vector multiplication : v = c * v .
 impl MulAssign<Scalar> for Vector {
     fn mul_assign(&mut self, c: Scalar) {
@@ -90,7 +104,7 @@ impl<'a, 'b> Mul<&'a Vector> for &'b Vector {
 }
 
 /// reverse order of ten bits i . e . 0 x200 -> 0 x001 and vice versa
-pub fn bitrev10(x: usize) -> usize {
+fn bitrev10(x: usize) -> usize {
     let mut x = x & 0x3ff;
     x = (x << 5) | (x >> 5);
     let mut t = (x ^ (x >> 4)) & 0x021;
@@ -101,7 +115,9 @@ pub fn bitrev10(x: usize) -> usize {
 }
 
 /// Slow number theoretic transform and scaling : d = c * NTT ( v ) .
-pub fn slow_ntt(v: &Vector, c: Scalar) -> NttVector {
+/// c is hardcoded to 27
+pub fn ntt(v: Vector) -> NttVector {
+    let c = 27;
     let mut d = [0; HILA5_N];
     for (i, di) in d.iter_mut().enumerate() {
         let r = (2 * bitrev10(i) + 1) as Scalar;
@@ -118,9 +134,11 @@ pub fn slow_ntt(v: &Vector, c: Scalar) -> NttVector {
 
 
 
-
-/// Slow inverse number theoretic transform : d = NTT ^ -1( v ) .
-pub fn slow_intt(v: &NttVector) -> Vector {
+/// Slow inverse number theoretic transform : d = c * NTT ^ -1( v ) .
+/// We automatically clear the usual factor of n = 2^10
+pub fn intt(v: NttVector, c: Scalar) -> Vector {
+    // 12277 = 2^-10
+    let c = 12277 * c % HILA5_Q;
     let mut d = [0; HILA5_N];
     for (i, vi) in v.0.iter().enumerate() {
         let r = (2 * bitrev10(i) + 1) as Scalar;
@@ -130,7 +148,18 @@ pub fn slow_intt(v: &NttVector) -> Vector {
             k = (k - r) & 0x7ff;
         }
     }
+    for dj in d.iter_mut() {
+        *dj = (*dj * c) % HILA5_Q;
+    }
     Vector(d)
+}
+
+/// return a * b + c
+pub fn mul_add<'b, 'c, V: 'b + 'c>(a: &V, b: &'b V, c: &'c V) -> V
+    where V: Hila5Vector, 
+          for<'a> &'a V: Mul<&'b V, Output=V> + Add<&'c V, Output=V>
+{
+    &(a * b) + c
 }
 
 /// Pointwise multiplication : d = a (*) b . (== `slow_vmul`)
@@ -169,38 +198,39 @@ mod test {
             fibv[i] = (fibv[i-1] + fibv[i-2]) % HILA5_Q;
         }
         let fibv = Vector(fibv);
-        let fib_ntt = slow_ntt(&fibv, 1);
+        let fibv_clone = Vector(fibv.0.clone());
+        let fib_ntt = &ntt(fibv) * 9103; // manually clear the factor of 27
         assert_eq!(&fib_ntt.0[..5], &[10951, 5645, 3732, 4089, 442]);
         assert_eq!(&fib_ntt.0[HILA5_N - 5..], &[10237, 754, 6341, 4211, 7921]);
-        let rec = slow_intt(&fib_ntt);
+        let rec = intt(fib_ntt, 1024);
         assert_eq!(&rec.0[..5], &[0, 1024, 1024, 2048, 3072]);
         assert_eq!(&rec.0[HILA5_N - 5..], &[11912, 333, 12245, 289, 245]);
+        let rec2 = &rec * 12277;
+        assert_eq!(&rec2.0[..], &fibv_clone.0[..]);
     }
 
     #[test]
     fn random_test() {
         let rng = SystemRandom::new();
-        let mut rand_bytes = [0u8; 4 * HILA5_N];
+        let mut rand_bytes = [0u8; 64];
 
         for _ in 0..10 {
             rng.fill(&mut rand_bytes).unwrap();
-            let mut a = [0; HILA5_N];
-            let mut b = [0; HILA5_N];
-            
-            for i in 0..HILA5_N {
-                let ai = ((rand_bytes[2*i] as Scalar) << 8  | (rand_bytes[2*i + 1]) as Scalar) % HILA5_Q;
-                let bi = ((rand_bytes[HILA5_N + 2*i] as Scalar) << 8 | (rand_bytes[HILA5_N + 2*i + 1]) as Scalar) % HILA5_Q;
-                a[i] = ai as Scalar;
-                b[i] = bi as Scalar;
-            }
-            let a = Vector(a);
-            let b = Vector(b);
+
+            let mut a: Vector = rand::from_seed(&rand_bytes[..32]);
+            a.norm();
+
+            let mut b: Vector = rand::from_seed(&rand_bytes[32..]);
+            b.norm();
 
             let x: Vector = &a * &b; // x is a * b
-            let t = slow_ntt(&a, 1); // t is NTT(a)
-            let y = slow_ntt(&b, 12277); // y is NTT(n) / 1024
-            let t: NttVector = &t * &y; // t is NTT(a) * NTT(b) / 1024
-            let y = slow_intt(&t); // y is a * b
+            let t = ntt(a); // t is NTT(a)
+            let y = ntt(b); // y is NTT(n)
+            let mut t: NttVector = &t * &y; // t is NTT(a) * NTT(b)
+            t.norm();
+            // let y = intt(t, , 1); // y is a * b
+            // Need to clear 3^6 factor; 12171 = 3^-6
+            let y = arith::intt(t, 12171);
 
             assert_eq!( &x.0[..], &y.0[..] );
         }
