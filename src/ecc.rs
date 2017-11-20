@@ -1,3 +1,10 @@
+/// XE5 error correcting codes
+
+// Rust port
+// Original code due to:
+// 2017-09-09  Markku-Juhani O. Saarinen <mjos@iki.fi>
+
+
 #[cfg(target_endian = "big")]
 use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian, BigEndian};
 #[cfg(target_endian = "big")]

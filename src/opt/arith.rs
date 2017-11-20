@@ -1,3 +1,18 @@
+// Modified from code released by Microsoft under MIT License and 
+// 2017-05-11  Markku-Juhani O. Saarinen <mjos@iki.fi> (as ms_ntt.c)    
+// 2017-11-20  Sam Scott <me@samjs.co.uk>
+
+/*****************************************************************************
+* LatticeCrypto: an efficient post-quantum Ring-Learning With Errors
+*   cryptography library
+*
+*    Copyright (c) Microsoft Corporation. All rights reserved.
+*
+*
+* Abstract: NTT functions and other polynomial operations
+*
+*****************************************************************************/
+
 use std::ops::{Add, Mul, MulAssign};
 
 use super::super::*;

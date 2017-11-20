@@ -1,3 +1,48 @@
+//! Rust implementation of [HILA5](https://github.com/mjosaarinen/hila5).
+//!
+//! This is a Rust port of the [HILA5 KEM](https://github.com/mjosaarinen/hila5).
+//! Reference document: [pdf](https://github.com/mjosaarinen/hila5/raw/master/Supporting_Documentation/hila5spec.pdf)
+//!
+//! ## Examples
+//!
+//! The main way of using this library is through the `PublicKey` and
+//! `PrivateKey` structs, and the `enc`/`dec` methods.
+//!
+//! ```rust
+//! extern crate hila5;
+//!
+//! use hila5::{kem, PublicKey, PrivateKey};
+//!
+//! fn main() {
+//!     // Bob generates keypair, and published `pkB`.
+//!     let (pk_bob, sk_bob) = hila5::crypto_kem_keypair().unwrap();
+//!
+//!     // Alice constructs ciphertext for Bob, and has shared secret `ssA`.
+//!     let (ct, ss_alice) = pk_bob.enc().unwrap();
+//!
+//!     // sends `ct` to Bob ...
+//!
+//!     // Bob recovers `ssB`
+//!     let ss_bob = sk_bob.dec(&ct).unwrap();
+//!
+//!     // Alice and Bob should have matching shared secrets
+//!     assert_eq!(ss_alice.0, ss_bob.0)
+//! }
+//!
+//! ```
+//!
+//! We also provide `crypto_kem_enc` and `crypto_kem_dec` methods to be closer
+//! to the original methods.
+//!
+//! ## Features
+//!
+//! The default features are `["opt"]`.  The `opt` feature is used to
+//! specify the optimised NTT methods based on
+//! Microsoft's [LatticeCrypto](https://www.microsoft.com/en-us/research/project/lattice-cryptography-library/)
+//!
+//! The `kat` feature is used to run the KAT tests, and uses a seeded RNG for
+//! predictable outputs. Do not use this feature other than for testing.
+
 extern crate byteorder;
 extern crate digest;
 #[macro_use]
@@ -14,7 +59,8 @@ use sha3::{Digest, Sha3_256};
 mod arith;
 mod ecc;
 mod encode;
-mod kem;
+/// Key encapsulation/decapsulation methods.
+pub mod kem;
 mod keygen;
 #[cfg(feature = "opt")]
 mod opt;
@@ -23,6 +69,8 @@ use opt::arith;
 mod rand;
 mod recon;
 
+
+/// Error handling and conversion
 pub mod errors {
     use ring;
     use std::{fmt, io};
@@ -37,31 +85,39 @@ pub mod errors {
 
 use errors::*;
 
+#[doc(inline)]
 pub use keygen::{crypto_kem_keypair, PrivateKey, PublicKey};
+#[doc(inline)]
 pub use kem::SharedSecret;
 
+/// Key encapsulation
 pub fn crypto_kem_enc(pk: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
     let pk = PublicKey::from_bytes(pk);
     kem::enc(&pk).map(|(ct, ss)| (ct, ss.0))
 }
 
+/// Key decapsulation
 pub fn crypto_kem_dec(sk: &[u8], ct: &[u8]) -> Result<Vec<u8>> {
     let sk = PrivateKey::from_bytes(sk);
     kem::dec(ct, &sk).map(|ss| ss.0)
 }
 
-// pub use keygen::{crypto_kem_keypair, PublicKey, PrivateKey};
-// pub use kem::{crypto_kem_enc, crypto_kem_dec, Ciphertext, SharedSecret};
-
+/// Lattice Dimension
 pub const HILA5_N: usize = 1024;
+/// Lattice Modulus
 pub const HILA5_Q: i32 = 12_289;
 
+/// Length in bytes of `PublicKey` on calling `write_to`.
 pub const PUBKEY_LEN: usize = rand::SEED_LEN + encode::PACKED14;
+/// Length in bytes of `PrivateKey` on calling `write_to`.
 pub const PRIVKEY_LEN: usize = encode::PACKED14 + 32;
+/// Output ciphertext len from `kem::dec`
 pub const CIPHERTEXT_LEN: usize = encode::PACKED14 + (HILA5_N / 8) + recon::PAYLOAD_LEN + recon::ECC_LEN;
 
 pub type Scalar = i32;
+/// Standard vector type
 pub struct Vector([Scalar; HILA5_N]);
+/// Vector mapped under the NTT transform.
 pub struct NttVector([Scalar; HILA5_N]);
 
 use std::fmt;
@@ -77,6 +133,7 @@ impl fmt::Debug for NttVector {
     }
 }
 
+/// Trait for methods agnostic over `Vector` or `NttVector` types.
 pub trait Hila5Vector: From<[Scalar; HILA5_N]> {
     fn get_inner(&self) -> &[Scalar; HILA5_N];
     fn get_inner_mut(&mut self) -> &mut [Scalar; HILA5_N];
@@ -126,29 +183,29 @@ impl From<[Scalar; HILA5_N]> for NttVector {
     }
 }
 
+/// Convenience function for producing SHA3 hash
 fn sha3(input: &[u8]) -> Vec<u8> {
     let mut hasher = Sha3_256::default();
     hasher.input(input);
     hasher.result().to_vec()
 }
 
-#[cfg(not(test))]
+#[cfg(not(all(feature = "kat", test)))]
 fn get_rng() -> ring::rand::SystemRandom {
     ring::rand::SystemRandom::new()
 }
 
-#[cfg(test)]
+/// Used for reproducible KAT tests.
+#[cfg(all(feature = "kat", test))]
 fn get_rng() -> test::KatRandom {
     test::KatRandom
 }
 
 
-#[cfg(test)]
+#[cfg(all(test, feature = "kat"))]
 mod test {
     use ring::rand::SecureRandom;
     use ring::error::Unspecified;
-
-    use super::print_bstr;
 
     pub struct KatRandom;
 
@@ -163,7 +220,6 @@ mod test {
 
     extern "C" {
         fn randombytes(x: *mut u8, xlen: u64) -> i32;
-
         fn randombytes_init(entropy_input: *mut u8, personalization_string: *mut u8, security_strength: i32);
     }
 
@@ -177,17 +233,6 @@ mod test {
         unsafe {
             randombytes_init(entropy_input.as_mut_ptr(), [].as_mut_ptr(), 256);
         }
-
-        // for (int i=0; i<100; i++) {
-        //     fprintf(fp_req, "count = %d\n", i);
-        //     randombytes(seed, 48);
-        //     fprintBstr(fp_req, "seed = ", seed, 48);
-        //     fprintf(fp_req, "pk =\n");
-        //     fprintf(fp_req, "sk =\n");
-        //     fprintf(fp_req, "ct =\n");
-        //     fprintf(fp_req, "ss =\n\n");
-        // }
-        // fclose(fp_req);
 
         let rng = KatRandom;
         let mut seeds = (0..100).map(|_| {
@@ -228,10 +273,10 @@ mod test {
         }
     }
 
-}
-pub fn print_bstr(b: &[u8]) {
-    for bi in b {
-        print!("{:02x}", bi);
+    fn print_bstr(b: &[u8]) {
+        for bi in b {
+            print!("{:02x}", bi);
+        }
+        println!();
     }
-    println!();
 }

@@ -1,3 +1,11 @@
+/// Packing and unpacking of `Vector` objects
+///
+/// Packing goes from [i32; 1024] to [u8; 1792]
+
+// Rust port
+// Original code due to:
+// 2017-09-09  Markku-Juhani O. Saarinen <mjos@iki.fi>
+
 use std::io::Write;
 
 use super::*;

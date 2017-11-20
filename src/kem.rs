@@ -1,3 +1,11 @@
+/// Public key encapsulation/decapsulation methods for negotiating a shared
+/// secret
+
+// Rust port
+// Original code due to:
+// 2017-09-09  Markku-Juhani O. Saarinen <mjos@iki.fi>
+
+
 use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian};
 use sha3::{Digest, Sha3_256};
 
@@ -9,6 +17,7 @@ use errors::*;
 
 const MAX_ITER: usize = 1000;
 
+/// Wrapper for shared secret type
 pub struct SharedSecret(pub Vec<u8>);
 
 /// Type-friendly version of `crypto_kem_enc`
@@ -59,12 +68,13 @@ pub fn enc(pk: &keygen::PublicKey) -> Result<(Vec<u8>, SharedSecret)> {
 
 
     // recover the seed/generator
-    let g: NttVector = rand::from_seed(&pk.seed);
+    // let g: NttVector = rand::from_seed(&pk.seed);
+    let g: &NttVector = &pk.gen;
     // generate some random noise
     let t: Vector = rand::psi16();
     let e = arith::ntt(t);
     // secret key is a = g*b + e
-    let mut a = arith::mul_add(&g, &b, &e);
+    let mut a = arith::mul_add(g, &b, &e);
     a.norm();
 
     encode::pack14(&a, &mut &mut ct[..PACKED14])?;

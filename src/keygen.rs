@@ -1,3 +1,10 @@
+/// Key generation methods
+
+// Rust port
+// Original code due to:
+// 2017-09-09  Markku-Juhani O. Saarinen <mjos@iki.fi>
+
+
 use ring::rand::SecureRandom;
 
 use std::io::Write;
@@ -6,31 +13,52 @@ use super::*;
 use encode::PACKED14;
 use errors::*;
 
+
+/// Hila5 public key type.
+///
+/// Contains the seed to generate the generator, the generator itself (`g`), and the 
+/// public key (`A`).
 pub struct PublicKey {
-    pub seed: [u8; rand::SEED_LEN],
+    seed: [u8; rand::SEED_LEN],
+    pub gen: NttVector,
     pub key:  NttVector,
 }
 
+/// Hila5 private key type.
+///
+/// Contains the `NttVector` key, and the hash of the
+/// public key (needed for API compatability, `crypto_kem_dec` does not take PK
+/// as input).
 pub struct PrivateKey {
     key: NttVector,
     pub pk_digest: Vec<u8>,
 }
 
 impl PublicKey {
+    /// Unpacks a public key from the generator seed, and the packed public
+    /// key value.
     pub fn from_bytes(input: &[u8]) -> Self {
         let mut seed = [0u8; rand::SEED_LEN];
         seed.copy_from_slice(&input[..rand::SEED_LEN]);
+        let gen = rand::from_seed(&seed[..]);
         let key = encode::unpack14(&input[rand::SEED_LEN..]);
-        Self { seed, key }
+        Self { seed, gen, key }
     }
 
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
+    /// Write the serialised public key to the `writer`.
+    pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_all(&self.seed)?;
         encode::pack14(&self.key, writer)
+    }
+
+    pub fn enc(&self) -> Result<(Vec<u8>, SharedSecret)> {
+        kem::enc(&self)
     }
 }
 
 impl PrivateKey {
+    /// Unpacks a private key from the packed private key vector and the
+    /// public key digest.
     pub fn from_bytes(input: &[u8]) -> Self {
         let key = encode::unpack14(&input[..PACKED14]);
         let mut pk_digest = vec![];
@@ -38,6 +66,7 @@ impl PrivateKey {
         Self { key, pk_digest }
     }
 
+    /// Write the serialised private key to the `writer`.
     pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
         encode::pack14(&self.key, writer)?;
         writer.write_all(&self.pk_digest)?;
@@ -59,6 +88,10 @@ impl PrivateKey {
         };
         ss.norm();
         ss
+    }
+
+    pub fn dec(&self, ct: &[u8]) -> Result<SharedSecret> {
+        kem::dec(&ct, self)
     }
 }
 
@@ -91,6 +124,7 @@ pub fn crypto_kem_keypair() -> Result<(PublicKey, PrivateKey)> {
     Ok((
         PublicKey {
             seed: seed,
+            gen: g,
             key: t,
         },
         PrivateKey {

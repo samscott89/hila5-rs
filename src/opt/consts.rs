@@ -1,3 +1,18 @@
+// Modified from code released by Microsoft under MIT License and 
+// 2017-05-11  Markku-Juhani O. Saarinen <mjos@iki.fi> (as ms_ntt_consts.c)    
+// 2017-11-20  Sam Scott <me@samjs.co.uk>
+
+/*****************************************************************************
+* LatticeCrypto: an efficient post-quantum Ring-Learning With Errors
+*  cryptography library
+*
+*    Copyright (c) Microsoft Corporation. All rights reserved.
+*
+*
+* Abstract: fixed constants for the Number Theoretic Transform (NTT)
+*
+*****************************************************************************/
+
 // Index-reversed matrices containing powers of and inverse powers of omega
 pub const MSLC_PSI_REV_NTT1024: [i32; 1024] =
 [

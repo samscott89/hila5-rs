@@ -1,7 +1,11 @@
+/// Reference implementations of basic arithmetic operations
+///
+/// Included is: vector and scalar multiplication, and NTT and inverse 
+/// transformations.
+
 use std::ops::{Add, Mul, MulAssign};
 
 use super::*;
-
 
 lazy_static! {
     /// powers of g =1945 mod q
