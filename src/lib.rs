@@ -72,13 +72,26 @@ pub type Scalar = i32;
 pub struct Vector([Scalar; HILA5_N]);
 pub struct NttVector([Scalar; HILA5_N]);
 
+use std::fmt;
+impl fmt::Debug for Vector {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Vector([{}...])", self.0[0..5].iter().fold("".to_string(), |acc, &x| acc + &x.to_string() + ", "))
+    }
+}
+
+impl fmt::Debug for NttVector {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "NttVector([{}...])", self.0[0..5].iter().fold("".to_string(), |acc, &x| acc +  &x.to_string() + ", "))
+    }
+}
+
 pub trait Hila5Vector: From<[Scalar; HILA5_N]> {
     fn get_inner(&self) -> &[Scalar; HILA5_N];
     fn get_inner_mut(&mut self) -> &mut [Scalar; HILA5_N];
 
     #[cfg(feature = "ntt")]
     fn norm(&mut self) {
-        arith::two_reduce12289(self);
+        // arith::two_reduce12289(self);
         arith::correction(self);
     }
 
@@ -128,3 +141,106 @@ fn sha3(input: &[u8]) -> Vec<u8> {
     hasher.result().to_vec()
 }
 
+#[cfg(not(test))]
+fn get_rng() -> ring::rand::SystemRandom {
+    ring::rand::SystemRandom::new()
+}
+
+#[cfg(test)]
+fn get_rng() -> test::KatRandom {
+    test::KatRandom
+}
+
+
+#[cfg(test)]
+mod test {
+    use ring::rand::SecureRandom;
+    use ring::error::Unspecified;
+
+    use super::print_bstr;
+
+    pub struct KatRandom;
+
+    impl SecureRandom for KatRandom {
+        fn fill(&self, dest: &mut [u8]) -> Result<(), Unspecified> {
+            unsafe {
+                randombytes(dest.as_mut_ptr(), dest.len() as u64);
+            }
+            Ok(())
+        }
+    }
+
+    extern "C" {
+        fn randombytes(x: *mut u8, xlen: u64) -> i32;
+
+        fn randombytes_init(entropy_input: *mut u8, personalization_string: *mut u8, security_strength: i32);
+    }
+
+
+    #[test]
+    fn kat_test() {
+        let mut entropy_input = [0u8; 48];
+        for i in 0..48 {
+            entropy_input[i] = i as u8;
+        }
+        unsafe {
+            randombytes_init(entropy_input.as_mut_ptr(), [].as_mut_ptr(), 256);
+        }
+
+        // for (int i=0; i<100; i++) {
+        //     fprintf(fp_req, "count = %d\n", i);
+        //     randombytes(seed, 48);
+        //     fprintBstr(fp_req, "seed = ", seed, 48);
+        //     fprintf(fp_req, "pk =\n");
+        //     fprintf(fp_req, "sk =\n");
+        //     fprintf(fp_req, "ct =\n");
+        //     fprintf(fp_req, "ss =\n\n");
+        // }
+        // fclose(fp_req);
+
+        let rng = KatRandom;
+        let mut seeds = (0..100).map(|i| {
+            // println!("count = {:?}", i);
+            let mut seed = [0u8; 48];
+            rng.fill(&mut seed).unwrap();
+            // print!("seed = ");
+            // print_bstr(&seed);
+            seed
+        }).collect::<Vec<[u8; 48]>>();
+            
+        for i in 0..100 {
+            let seed: &mut [u8] = &mut seeds[i];
+            print!("seed = ");
+            print_bstr(seed);
+
+            unsafe {
+                randombytes_init(seed.as_mut_ptr(), [].as_mut_ptr(), 256);
+            }
+            let (pk, sk) = ::crypto_kem_keypair().unwrap();
+            let mut pkb = vec![];
+            pk.write_to(&mut pkb).unwrap();
+            print!("pk = ");
+            print_bstr(&pkb);
+            let mut skb = vec![];
+            sk.write_to(&mut skb).unwrap();
+            print!("sk = ");
+            print_bstr(&skb);
+
+            let (ct, ss) = ::crypto_kem_enc(&pkb).unwrap();
+            print!("ct = ");
+            print_bstr(&ct);
+            print!("ss = ");
+            print_bstr(&ss);
+
+            let ss1 = ::crypto_kem_dec(&skb, &ct).unwrap();
+            assert_eq!(ss1, ss);
+        }
+    }
+
+}
+pub fn print_bstr(b: &[u8]) {
+    for bi in b {
+        print!("{:02x}", bi);
+    }
+    println!("");
+}

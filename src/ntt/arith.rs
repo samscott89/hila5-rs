@@ -151,11 +151,11 @@ pub fn ntt(v: Vector) -> NttVector {
 /// Fast inverse number theoretic transform : d = c * NTT ^ -1( v ) .
 /// Result already has the usual n=1024 factor cleared
 pub fn intt(v: NttVector, c: Scalar) -> Vector {
-    // 12277 = 2^-10 * 
-    // 2950 = 2^-10 * 11227 (why 11227?)
+    // 12277 = 2^-10
+    // 2950 = 2^-10 * 11227 = 2^-10 * 3^-4 (why 3^-4 here?)
     // let o_inv = 12277 * c % HILA5_Q;
     let o_inv = 2950 * c % HILA5_Q;
-    // n_inv is o_inv * sqrt(-1)
+    // n_inv is o_inv * sqrt(-1) ((sqrt(-1) = 1479))
     let n_inv = 455 * c % HILA5_Q;
     let mut d =  v.0;
 
@@ -171,7 +171,7 @@ pub fn intt(v: NttVector, c: Scalar) -> Vector {
                 let u = d[j];
                 let v = d[j + k];
                 d[j] = u + v;
-                let tmp = ((u - v) as i64 * s as i64);
+                let tmp = (u - v) as i64 * s as i64;
                 if m == 32 {
                     d[j] = reduce_12289(d[j] as i64);
                     d[j + k] = reduce12289_2x(tmp);
@@ -217,7 +217,7 @@ impl<'a, 'b> Mul<&'a NttVector> for &'b NttVector {
         let a = self;
         let mut d = [0; HILA5_N];
         for (di, (ai, bi)) in d.iter_mut().zip(a.0.iter().zip(b.0.iter())) {
-            *di = reduce_12289(reduce_12289(((ai * bi) as i64)) as i64);
+            *di = reduce_12289(reduce_12289((*ai as i64 * *bi as i64)) as i64);
         }
         NttVector(d)
     }
@@ -255,9 +255,10 @@ pub fn correction<V: Hila5Vector>(v: &mut V) {
         let mask = *vi >> 15;
         *vi += (HILA5_Q & mask) - HILA5_Q;
         let mask = *vi >> 15;
-        *vi += (HILA5_Q & mask);
+        *vi += HILA5_Q & mask;
     }
 }
+
 
 #[cfg(test)]
 mod test {
@@ -274,6 +275,7 @@ mod test {
         let fibv = Vector(fibv);
         let fibv_clone = Vector(fibv.0.clone());
         let mut fib_ntt = ntt(fibv);
+        two_reduce12289(&mut fib_ntt);
         fib_ntt.norm();
          // ntt multiplies by 27 inherently. this cancels that out so we have
          // fib_ntt = NTT(fibv)
@@ -281,6 +283,7 @@ mod test {
         assert_eq!(&fib_ntt.0[..5], &[10951, 5645, 3732, 4089, 442]);
         assert_eq!(&fib_ntt.0[HILA5_N - 5..], &[10237, 754, 6341, 4211, 7921]);
         let mut rec = intt(fib_ntt, 1024);
+        two_reduce12289(&mut rec);
         rec.norm();
         assert_eq!(&rec.0[..5], &[0, 1024, 1024, 2048, 3072]);
         assert_eq!(&rec.0[HILA5_N - 5..], &[11912, 333, 12245, 289, 245]);
@@ -299,26 +302,58 @@ mod test {
             rng.fill(&mut rand_bytes).unwrap();
 
             let mut a: Vector = rand::from_seed(&rand_bytes[..32]);
+            two_reduce12289(&mut a);
             a.norm();
 
             let mut b: Vector = rand::from_seed(&rand_bytes[32..]);
+            two_reduce12289(&mut b);
             b.norm();
 
             let x: Vector = &a * &b; // x is a * b
             let mut t = ntt(a); // t is NTT(a)
+            two_reduce12289(&mut t);
             t.norm();
             let mut y = ntt(b); // y is NTT(n)
+            two_reduce12289(&mut y);
             y.norm();
             let mut t: NttVector = &t * &y; // t is NTT(a) * NTT(b)
              // result is actually 9 * NTT(a) * NTT(b), clear it?
             t = &t * 2731;
-            // t.norm();
-            // let y = intt(t, , 1); // y is a * b
-            // Need to clear factor of 3^6 for some reason. 9545 = 3^-8
+
+            // Need to clear factor of 3^6.
             let mut y = arith::intt(t, 12171);
+            two_reduce12289(&mut y);
             y.norm();
             // let y = &y * 7755;
             assert_eq!( &y.0[..5], &x.0[..5]);
+        }
+    }
+
+    #[test]
+    fn round_trip() {
+        let rng = SystemRandom::new();
+        let mut rand_bytes = [0u8; 64];
+        rand_bytes[0] = 0xff;
+
+        for _ in 0..10 {
+            rng.fill(&mut rand_bytes).unwrap();
+
+            let mut a: Vector = rand::from_seed(&rand_bytes[..32]);
+            two_reduce12289(&mut a);
+            a.norm();
+
+            let mut a2: Vector = rand::from_seed(&rand_bytes[..32]);
+            two_reduce12289(&mut a2);
+            a2.norm();
+
+            let a = arith::ntt(a);
+            // We get an extra factor of 3 somehow
+            let mut a = arith::intt(a, 8193);
+            two_reduce12289(&mut a);
+            a.norm();
+
+            // should have factors cleared automatically
+            assert_eq!(&a.0[..5], &a2.0[..5]); 
         }
     }
 }

@@ -1,7 +1,7 @@
 use super::*;
 
 use digest::{Input, ExtendableOutput ,XofReader};
-use ring::rand::{SecureRandom, SystemRandom};
+use ring::rand::SecureRandom;
 use sha3::Shake256;
 
 pub const SEED_LEN: usize = 32;
@@ -32,7 +32,8 @@ pub fn from_seed<V: Hila5Vector>(seed: &[u8]) -> V {
 /// sample a vector of values from the psi16 distribution
 /// aka `hila5_psi16`
 pub fn psi16<V: Hila5Vector>() -> V {
-    let rng = SystemRandom::new();
+    // let rng = SystemRandom::new();
+    let rng = get_rng();
     let mut v = [0; HILA5_N];
     for vi in v.iter_mut() {
         let mut rand_bytes = [0u8; 4];
