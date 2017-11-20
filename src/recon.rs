@@ -7,7 +7,7 @@ use super::*;
 
 const HILA5_B: Scalar = 799;
 const KEY_LEN: usize = 32;
-const ECC_LEN: usize = 30;
+pub const ECC_LEN: usize = 30;
 pub const PAYLOAD_LEN: usize = (KEY_LEN + ECC_LEN);
 
 

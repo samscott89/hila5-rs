@@ -69,7 +69,7 @@ mod test {
         x[..4].copy_from_slice(&[10951, 5645, 3732, 4089]);
         let x = Vector(x);
         let mut y = [0; PACKED14];
-        pack14(&x, &mut &mut y[..]);
+        pack14(&x, &mut &mut y[..]).unwrap();
         assert_eq!(&y[..7], &[0xC7, 0x6A, 0x83, 0x45, 0xE9, 0xE4, 0x3F]);
         assert_eq!(&x.0[..], &unpack14::<Vector>(&y).0[..]);
 

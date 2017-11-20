@@ -2,25 +2,13 @@ extern crate byteorder;
 extern crate digest;
 #[macro_use]
 extern crate error_chain;
-#[cfg(any(test, not(feature = "ntt")))]
+#[cfg(not(feature = "ntt"))]
 #[macro_use]
 extern crate lazy_static;
 extern crate sha3;
 extern crate ring;
 
 use sha3::{Digest, Sha3_256};
-
-#[cfg(test)]
-macro_rules! abbrev_eq {
-    (V $x:ident, $len_l:expr, $len_r:expr, $($l:expr,)* ~ $($r:expr),*) => ( 
-        assert_eq!(&$x.0[..$len_l], &[$($l,)*]);
-        assert_eq!(&$x.0[HILA5_N - $len_r..], &[$($r,)*]);
-    );
-    ($x:ident, $len_l:expr, $len_r:expr, $($l:expr,)* ~ $($r:expr),*) => ( 
-        assert_eq!(&$x[..$len_l], &[$($l,)*]);
-        assert_eq!(&$x[$len_r..], &[$($r,)*]);
-    )
-}
 
 #[cfg(not(feature = "ntt"))]
 mod arith;
@@ -59,14 +47,18 @@ pub fn crypto_kem_enc(pk: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
 
 pub fn crypto_kem_dec(sk: &[u8], ct: &[u8]) -> Result<Vec<u8>> {
     let sk = PrivateKey::from_bytes(sk);
-    kem::dec(&ct, &sk).map(|ss| ss.0)
+    kem::dec(ct, &sk).map(|ss| ss.0)
 }
 
 // pub use keygen::{crypto_kem_keypair, PublicKey, PrivateKey};
 // pub use kem::{crypto_kem_enc, crypto_kem_dec, Ciphertext, SharedSecret};
 
 pub const HILA5_N: usize = 1024;
-pub const HILA5_Q: i32 = 12289;
+pub const HILA5_Q: i32 = 12_289;
+
+pub const PUBKEY_LEN: usize = rand::SEED_LEN + encode::PACKED14;
+pub const PRIVKEY_LEN: usize = encode::PACKED14 + 32;
+pub const CIPHERTEXT_LEN: usize = encode::PACKED14 + (HILA5_N / 8) + recon::PAYLOAD_LEN + recon::ECC_LEN;
 
 pub type Scalar = i32;
 pub struct Vector([Scalar; HILA5_N]);
@@ -199,7 +191,7 @@ mod test {
         // fclose(fp_req);
 
         let rng = KatRandom;
-        let mut seeds = (0..100).map(|i| {
+        let mut seeds = (0..100).map(|_| {
             // println!("count = {:?}", i);
             let mut seed = [0u8; 48];
             rng.fill(&mut seed).unwrap();
@@ -242,5 +234,5 @@ pub fn print_bstr(b: &[u8]) {
     for bi in b {
         print!("{:02x}", bi);
     }
-    println!("");
+    println!();
 }

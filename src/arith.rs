@@ -111,7 +111,7 @@ fn bitrev10(x: usize) -> usize {
     x ^= t ^ (t << 4);
     t = (x ^ (x >> 2)) & 0x042;
     x ^= t ^ (t << 2);
-    return x & 0x3ff;
+    x & 0x3ff
 }
 
 /// Slow number theoretic transform and scaling : d = c * NTT ( v ) .
@@ -138,7 +138,7 @@ pub fn ntt(v: Vector) -> NttVector {
 /// We automatically clear the usual factor of n = 2^10
 pub fn intt(v: NttVector, c: Scalar) -> Vector {
     // 12277 = 2^-10
-    let c = 12277 * c % HILA5_Q;
+    let c = 12_277 * c % HILA5_Q;
     let mut d = [0; HILA5_N];
     for (i, vi) in v.0.iter().enumerate() {
         let r = (2 * bitrev10(i) + 1) as Scalar;

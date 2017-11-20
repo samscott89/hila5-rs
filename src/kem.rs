@@ -25,7 +25,7 @@ pub fn enc(pk: &keygen::PublicKey) -> Result<(Vec<u8>, SharedSecret)> {
         b = arith::ntt(rand::psi16());
         let e = a * &b;
         // Need to clear 3^6 factor; 12171 = 3^-6
-        let mut t = arith::intt(e, 12171);
+        let mut t = arith::intt(e, 12_171);
 
         #[cfg(feature="ntt")]
         arith::two_reduce12289 (&mut t);
@@ -33,7 +33,6 @@ pub fn enc(pk: &keygen::PublicKey) -> Result<(Vec<u8>, SharedSecret)> {
         t.norm();
 
         if let Ok(x) = recon::safebits(&t) {
-            println!("t: {:?}", t);
             break x;
         }
 
@@ -50,7 +49,7 @@ pub fn enc(pk: &keygen::PublicKey) -> Result<(Vec<u8>, SharedSecret)> {
     // r now contains redundancy for z XOR the one-time pad data
     ecc::xe5_cod(&z, &mut r);
 
-    for zi in r.iter() {
+    for zi in &r {
         ct.write_u64::<LittleEndian>(*zi)?;
     }
 
@@ -115,7 +114,7 @@ pub fn dec(ct: &[u8], sk: &keygen::PrivateKey) -> Result<SharedSecret> {
     let mut hasher = Sha3_256::default();
     hasher.input(b"HILA5v10");
     hasher.input(&sk.pk_digest);
-    hasher.input(&sha3(&ct));
+    hasher.input(&sha3(ct));
     hasher.input(&z_bytes);
     let ss = hasher.result().to_vec();
 

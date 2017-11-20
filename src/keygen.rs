@@ -49,16 +49,15 @@ impl PrivateKey {
         let mut ss = if cfg!(feature = "ntt") {
             // We get an extra 3^2 factor from these methods, so need to
             // clear9545 = 3^-8
-            let mut a = arith::intt(a, 9545);
+            let mut a = arith::intt(a, 9_545);
             #[cfg(feature = "ntt")]
             arith::two_reduce12289(&mut a);
             a
         } else {
             // Need to clear 3^6 factor; 12171 = 3^-6
-            arith::intt(a, 12171)
+            arith::intt(a, 12_171)
         };
         ss.norm();
-        println!("ss: {:?}", ss);
         ss
     }
 }
@@ -79,7 +78,7 @@ pub fn crypto_kem_keypair() -> Result<(PublicKey, PrivateKey)> {
     t.norm();
 
     let mut pk_bytes = [0u8; rand::SEED_LEN + PACKED14];
-    &pk_bytes[..rand::SEED_LEN].copy_from_slice(&seed[..]);
+    pk_bytes[..rand::SEED_LEN].copy_from_slice(&seed[..]);
     encode::pack14(&t, &mut (&mut pk_bytes[rand::SEED_LEN..]))?;
     let pk_digest = sha3(&pk_bytes).to_vec();
 
