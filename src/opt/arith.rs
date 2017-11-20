@@ -2,8 +2,8 @@ use std::ops::{Add, Mul, MulAssign};
 
 use super::super::*;
 
-use ntt::consts::MSLC_PSI_REV_NTT1024 as PSI_REV;
-use ntt::consts::MSLC_INV_REV_NTT1024 as OMEGAINV_REV;
+use opt::consts::MSLC_PSI_REV_NTT1024 as PSI_REV;
+use opt::consts::MSLC_INV_REV_NTT1024 as OMEGAINV_REV;
 
 /// Vector addition : d = a + b .
 impl<'a, 'b> Add<&'a Vector> for &'b Vector {

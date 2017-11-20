@@ -7,6 +7,7 @@ fn main() {
         .compile("kat");
 
     cc::Build::new()
+        .opt_level_str("fast")
         .files(&[
             "hila5/Optimized_Implementation/kem.c",
             "hila5/Optimized_Implementation/ms_ntt.c",

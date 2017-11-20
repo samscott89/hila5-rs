@@ -27,7 +27,7 @@ pub fn enc(pk: &keygen::PublicKey) -> Result<(Vec<u8>, SharedSecret)> {
         // Need to clear 3^6 factor; 12171 = 3^-6
         let mut t = arith::intt(e, 12_171);
 
-        #[cfg(feature="ntt")]
+        #[cfg(feature="opt")]
         arith::two_reduce12289 (&mut t);
 
         t.norm();

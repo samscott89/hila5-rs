@@ -2,7 +2,7 @@ extern crate byteorder;
 extern crate digest;
 #[macro_use]
 extern crate error_chain;
-#[cfg(not(feature = "ntt"))]
+#[cfg(not(feature = "opt"))]
 #[macro_use]
 extern crate lazy_static;
 extern crate sha3;
@@ -10,16 +10,16 @@ extern crate ring;
 
 use sha3::{Digest, Sha3_256};
 
-#[cfg(not(feature = "ntt"))]
+#[cfg(not(feature = "opt"))]
 mod arith;
-#[cfg(feature = "ntt")]
-use ntt::arith;
 mod ecc;
 mod encode;
 mod kem;
 mod keygen;
-#[cfg(feature = "ntt")]
-mod ntt;
+#[cfg(feature = "opt")]
+mod opt;
+#[cfg(feature = "opt")]
+use opt::arith;
 mod rand;
 mod recon;
 
@@ -81,13 +81,12 @@ pub trait Hila5Vector: From<[Scalar; HILA5_N]> {
     fn get_inner(&self) -> &[Scalar; HILA5_N];
     fn get_inner_mut(&mut self) -> &mut [Scalar; HILA5_N];
 
-    #[cfg(feature = "ntt")]
+    #[cfg(feature = "opt")]
     fn norm(&mut self) {
-        // arith::two_reduce12289(self);
         arith::correction(self);
     }
 
-    #[cfg(not(feature = "ntt"))]
+    #[cfg(not(feature = "opt"))]
     fn norm(&mut self) {
         for vi in self.get_inner_mut().iter_mut() {
             *vi = (*vi + 3 * HILA5_Q) % HILA5_Q;

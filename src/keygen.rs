@@ -46,11 +46,11 @@ impl PrivateKey {
 
     pub fn get_shared_secret(&self, b: &NttVector) -> Vector {
         let a = &self.key * b;
-        let mut ss = if cfg!(feature = "ntt") {
+        let mut ss = if cfg!(feature = "opt") {
             // We get an extra 3^2 factor from these methods, so need to
             // clear9545 = 3^-8
-            let mut a = arith::intt(a, 9_545);
-            #[cfg(feature = "ntt")]
+            let mut a = arith::intt(a, 9545);
+            #[cfg(feature = "opt")]
             arith::two_reduce12289(&mut a);
             a
         } else {
@@ -82,7 +82,7 @@ pub fn crypto_kem_keypair() -> Result<(PublicKey, PrivateKey)> {
     encode::pack14(&t, &mut (&mut pk_bytes[rand::SEED_LEN..]))?;
     let pk_digest = sha3(&pk_bytes).to_vec();
 
-    #[cfg(feature = "ntt")]
+    #[cfg(feature = "opt")]
     arith::two_reduce12289(&mut a);
 
     // Normalise A before storing
