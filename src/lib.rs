@@ -1,7 +1,6 @@
-//! Rust implementation of [HILA5](https://github.com/mjosaarinen/hila5).
+//! Rust implementation of [HILA5](https://mjos.fi/hila5/).
 //!
-//! This is a Rust port of the [HILA5 KEM](https://github.com/mjosaarinen/hila5).
-//! Reference document: [pdf](https://github.com/mjosaarinen/hila5/raw/master/Supporting_Documentation/hila5spec.pdf)
+//! This is a Rust port of the [HILA5 KEM](https://github.com/mjosaarinen/hila5). Reference document: [pdf](https://github.com/mjosaarinen/hila5/raw/master/Supporting_Documentation/hila5spec.pdf). Website: [https://mjos.fi/hila5/](https://mjos.fi/hila5/)
 //!
 //! ## Examples
 //!
